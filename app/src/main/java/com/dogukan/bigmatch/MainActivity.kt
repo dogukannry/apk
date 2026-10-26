@@ -1,6 +1,9 @@
 package com.dogukan.bigmatch
 
 import android.app.Activity
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
@@ -30,6 +33,9 @@ class MainActivity : Activity() {
         }
         add("Durdur") { startService(Intent(this, CaptureService::class.java).setAction(CaptureService.STOP)) }
         setContentView(root)
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1207)
+        }
     }
 
     @Deprecated("Activity result API for dependency-free build")

@@ -34,6 +34,7 @@ class CaptureService : Service() {
     private var state = 0 // 0 = scan; 1 = await hidden; 2 = tapping; 3 = completed
     private var firstSeen = 0L
     private var lastChecked = 0L
+    private var lastDiagnostic = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -68,6 +69,7 @@ class CaptureService : Service() {
     }
 
     private fun showNotification(status: String) {
+        TapService.active?.updateStatus(status)
         val stop = PendingIntent.getService(this, 2, Intent(this, CaptureService::class.java).setAction(STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val notification = Notification.Builder(this, channel)
@@ -112,8 +114,21 @@ class CaptureService : Service() {
         lastChecked = now
         if (state == 0) {
             val detected = CardVision.findCards(bitmap)
-            if (detected.size != 16) return
-            val solved = CardVision.solve(bitmap, detected) ?: return
+            if (detected.size != 16) {
+                if (now - lastDiagnostic > 2000) {
+                    TapService.active?.updateStatus("Kartlar aranıyor (${detected.size}/16)")
+                    lastDiagnostic = now
+                }
+                return
+            }
+            val solved = CardVision.solve(bitmap, detected)
+            if (solved == null) {
+                if (now - lastDiagnostic > 2000) {
+                    TapService.active?.updateStatus("16 kart bulundu, eşleşme belirsiz")
+                    lastDiagnostic = now
+                }
+                return
+            }
             cards = detected
             pairs = solved
             original?.recycle()
