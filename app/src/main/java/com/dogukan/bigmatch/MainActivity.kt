@@ -19,7 +19,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(36, 65, 36, 32) }
         val info = TextView(this).apply {
-            text = "Big Match Yardımcısı\n\n1. Erişilebilirlik hizmetini etkinleştirin.\n2. Ekran yakalama izni verin.\n3. Oyuna geçin; kartlar görünürken otomatik eşleştirme başlayacak.\n\nKartlar: 4×4, açık kalma: 5 saniye."
+            text = "Big Match Yardımcısı\n\n1. Erişilebilirlik hizmetini etkinleştirin.\n2. Ekran yakalama izni verin.\n3. Oyunda kartlar AÇIKKEN üst panelde OKU butonuna basın.\n4. Kartlar KAPANINCA EŞLEŞTİR butonuna basın.\n\nPaneldeki düğmeye uzun basarak yakalamayı durdurabilirsiniz."
             textSize = 18f
         }
         root.addView(info)
