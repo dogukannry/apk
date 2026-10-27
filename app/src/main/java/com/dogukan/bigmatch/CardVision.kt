@@ -82,20 +82,74 @@ object CardVision {
         return sqrt(sum / a.size)
     }
 
+    /**
+     * No preloaded McDonald's icons. Build a new visual signature for every card
+     * in the current round and choose the best GLOBAL pairing.
+     *
+     * Greedy pairing can steal a card from its real twin when two different icons
+     * happen to look similar; minimum-cost perfect matching avoids that.
+     */
     fun solve(bitmap: Bitmap, cards: List<Card>): List<Match>? {
         if (cards.size != 16) return null
         val images = cards.map { descriptor(bitmap, it) }
-        val choices = mutableListOf<Triple<Int, Int, Double>>()
-        for (i in 0 until 16) for (j in i+1 until 16) choices.add(Triple(i, j, distance(images[i], images[j])))
-        choices.sortBy { it.third }
-        val used = BooleanArray(16)
+        val distances = Array(16) { DoubleArray(16) }
+        for (i in 0 until 16) for (j in i + 1 until 16) {
+            val d = distance(images[i], images[j])
+            distances[i][j] = d
+            distances[j][i] = d
+        }
+
+        // 2^16 subsets: fast enough for a Galaxy S24 and independent of icon type.
+        val fullMask = (1 shl 16) - 1
+        val memo = DoubleArray(fullMask + 1) { Double.NaN }
+        val partner = IntArray(fullMask + 1) { -1 }
+        memo[0] = 0.0
+
+        fun best(mask: Int): Double {
+            if (!memo[mask].isNaN()) return memo[mask]
+            val first = Integer.numberOfTrailingZeros(mask)
+            val remaining = mask and (1 shl first).inv()
+            var lowest = Double.POSITIVE_INFINITY
+            var selected = -1
+            for (second in first + 1 until 16) {
+                if (remaining and (1 shl second) == 0) continue
+                val next = remaining and (1 shl second).inv()
+                val cost = distances[first][second] + best(next)
+                if (cost < lowest) {
+                    lowest = cost
+                    selected = second
+                }
+            }
+            partner[mask] = selected
+            memo[mask] = lowest
+            return lowest
+        }
+
+        best(fullMask)
         val pairs = mutableListOf<Match>()
-        for ((a, b, d) in choices) {
-            if (used[a] || used[b]) continue
-            // The identical icon artwork should be much closer than different icons.
-            if (d > 0.20) return null
-            used[a] = true; used[b] = true
-            pairs.add(Match(cards[a], cards[b]))
+        var mask = fullMask
+        while (mask != 0) {
+            val i = Integer.numberOfTrailingZeros(mask)
+            val j = partner[mask]
+            if (j < 0) return null
+            val d = distances[i][j]
+
+            // Confidence is measured against the other 14 icons in THIS round.
+            // A genuinely matching pair should be closer than competing icons.
+            var competingI = Double.POSITIVE_INFINITY
+            var competingJ = Double.POSITIVE_INFINITY
+            for (k in 0 until 16) {
+                if (k == i || k == j) continue
+                competingI = min(competingI, distances[i][k])
+                competingJ = min(competingJ, distances[j][k])
+            }
+            val competitor = min(competingI, competingJ)
+            val confident = d <= 0.36 &&
+                (d < 0.022 || (competitor - d >= 0.012 && d <= competitor * 0.86))
+            if (!confident) return null
+
+            pairs.add(Match(cards[i], cards[j]))
+            mask = mask and (1 shl i).inv() and (1 shl j).inv()
         }
         return pairs.takeIf { it.size == 8 }
     }
